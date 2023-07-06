@@ -17,55 +17,6 @@ namespace SensorProject.Repository
             this._context = context; 
         }
 
-        public async Task<ResponseDetails> AddEditParameterHistory(ParameterHistoryDto parameterHistoryObj)
-        {
-            List<ParameterDto> listParameter = null;
-            ResponseDetails responseDetail = null;
-            try
-            {
-                if(parameterHistoryObj.Id == 0)
-                {
-
-                 listParameter = new List<ParameterDto>();
-                 listParameter.Add(parameterHistoryObj.parameterObj);
-                    var parameterHistory = new tbl_ParameterHistory()
-                    {
-                        SensorId = parameterHistoryObj.SensorId,
-                        ParameterHistory = JsonConvert.SerializeObject(listParameter)
-                    };
-                    _context.tbl_ParameterHistory.Add(parameterHistory);
-                    _context.SaveChanges();
-
-                }
-                else
-                {
-                    var UpdateParameterHistory = _context.tbl_ParameterHistory.FirstOrDefault(x => x.Id == parameterHistoryObj.Id);
-                    if(UpdateParameterHistory != null)
-                    {
-                        listParameter = new List<ParameterDto>();
-                        listParameter = JsonConvert.DeserializeObject<List<ParameterDto>>(UpdateParameterHistory.ParameterHistory);
-                        listParameter.Add(parameterHistoryObj.parameterObj);
-                        UpdateParameterHistory.ParameterHistory = JsonConvert.SerializeObject(listParameter);
-                        UpdateParameterHistory.Id= parameterHistoryObj.Id;
-                        UpdateParameterHistory.SensorId= parameterHistoryObj.SensorId;
-                        _context.SaveChanges();
-
-                    }
-                    else
-                    {
-
-                    }
-
-                }
-            }
-            catch (Exception ex)
-            {
-
-                throw;
-            }
-            return await Task.Run(() => responseDetail);
-        }
-
         public async Task<ResponseDetails> AddSensor(Sensor_tbl sensor_Tbl)
         {
             ResponseDetails responseDetails = null;

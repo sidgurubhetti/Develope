@@ -1,10 +1,12 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace SensorProject.Entities
 {
     public class Sensor_tbl
     {
         [Key]
+        [JsonIgnore]
         public int SensorId { get; set; }
 
         [Required(ErrorMessage = "SensorName is required.")]

@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Newtonsoft.Json;
 using SensorProject.Context;
 using SensorProject.Entities;
 using SensorProject.IRepository;
@@ -13,107 +14,235 @@ namespace SensorProject.Repository
         {
             _context = context;
         }
-        /*public async Task<ResponseDetails> AddSensorData(SensorData_tbl sensorData_tbl)
+
+        /*public async Task<ResponseDetails> AddEditParameterHistory(ParameterHistoryDto parameterHistoryObj)
         {
-            ResponseDetails responseDetails = null;
+            List<ParameterDto> listParameter = null;
+            ResponseDetails responseDetail = null;
             try
             {
-                if (sensorData_tbl == null)
+                if (parameterHistoryObj.Id == 0)
                 {
-                    responseDetails = new ResponseDetails()
+
+                    listParameter = new List<ParameterDto>();
+                    listParameter.Add(parameterHistoryObj.parameterObj);
+                    var parameterHistory = new tbl_ParameterHistory()
                     {
-                        StatusCode = System.Net.HttpStatusCode.BadRequest,
-                        Message = "Please provide valid sensor data."
+                        SensorId = parameterHistoryObj.SensorId,
+                        ParameterHistory = JsonConvert.SerializeObject(listParameter)
                     };
-                    return await Task.Run(() => responseDetails);
+                    _context.tbl_ParameterHistory.Add(parameterHistory);
+                    _context.SaveChanges();
+
                 }
-
-                var sensorId = sensorData_tbl.SensorId;
-                var sensor = await _context.Sensor_tbl.FindAsync(sensorId);
-
-                if (sensor == null)
+                else
                 {
-                    responseDetails = new ResponseDetails()
+                    var UpdateParameterHistory = _context.tbl_ParameterHistory.FirstOrDefault(x => x.Id == parameterHistoryObj.Id);
+                    if (UpdateParameterHistory != null)
                     {
-                        StatusCode = System.Net.HttpStatusCode.BadRequest,
-                        Message = "Invalid SensorId"
+                        listParameter = new List<ParameterDto>();
+                        listParameter = JsonConvert.DeserializeObject<List<ParameterDto>>(UpdateParameterHistory.ParameterHistory);
+                        listParameter.Add(parameterHistoryObj.parameterObj);
+                        UpdateParameterHistory.ParameterHistory = JsonConvert.SerializeObject(listParameter);
+                        UpdateParameterHistory.Id = parameterHistoryObj.Id;
+                        UpdateParameterHistory.SensorId = parameterHistoryObj.SensorId;
+                        _context.SaveChanges();
+
+                    }
+                    else
+                    {
+
+                    }
+
+                }
+            }
+            catch (Exception ex)
+            {
+
+                throw;
+            }
+            return await Task.Run(() => responseDetail);
+        }
+*/
+
+        public async Task<ResponseDetails> AddEditParameterHistory(ParameterHistoryDto parameterHistoryObj)
+        {
+            List<ParameterDto> listParameter = null;
+            ResponseDetails responseDetail = null;
+            try
+            {
+                if (parameterHistoryObj.Id == 0)
+                {
+                    // Check if the SensorId already exists in the database
+                    var existingParameterHistory = await _context.tbl_ParameterHistory
+                        .FirstOrDefaultAsync(x => x.SensorId == parameterHistoryObj.SensorId);
+
+                    if (existingParameterHistory != null)
+                    {
+                        // Handle if a parameter history record with the same SensorId already exists
+                        // You can throw an exception or return an appropriate response indicating the error
+                        responseDetail = new ResponseDetails 
+                        { 
+                            Message = "Parameter history record with the same SensorId already exists!", 
+                            Success = false 
+                        };
+                        return responseDetail;
+                    }
+
+
+                    // Check the maximum parameter limit for the given SensorId
+                    var sensorId = parameterHistoryObj.SensorId;
+                    var existingParameterCount = await _context.tbl_ParameterHistory
+                        .CountAsync(x => x.SensorId == sensorId);
+
+                    //var totalParameterLimit = sensor.TotalParameter; // Assuming `sensor` object represents the relevant sensor
+
+                    /*if (existingParameterCount + parameterHistoryObj.Count > totalParameterLimit)
+                    {
+                        responseDetail = new ResponseDetails()
+                        {
+                            StatusCode = System.Net.HttpStatusCode.BadRequest,
+                            Message = "Only a maximum of " + totalParameterLimit + " parameters can be added for the given SensorId"
+                        };
+                        return responseDetail;
+                    }*/
+
+                    listParameter = new List<ParameterDto>();
+                    listParameter.Add(parameterHistoryObj.parameterObj);
+                    var parameterHistory = new tbl_ParameterHistory()
+                    {
+                        SensorId = parameterHistoryObj.SensorId,
+                        ParameterHistory = JsonConvert.SerializeObject(listParameter)
                     };
-                    return responseDetails;
+                    _context.tbl_ParameterHistory.Add(parameterHistory);
+                    _context.SaveChanges();
                 }
-
-                var totalParameterCount = sensor.TotalParameter;
-
-                // Get the property names starting with "P"
-                var parameterProperties = typeof(SensorData_tbl).GetProperties()
-                    .Where(p => p.Name.StartsWith("P") && p.PropertyType == typeof(string))
-                    .ToList();
-
-                // Validate the parameter count
-                var parameterCount = parameterProperties
-                    .Select(p => (string)p.GetValue(sensorData_tbl))
-                    .Count(value => !string.IsNullOrEmpty(value));
-
-                if (parameterCount > totalParameterCount)
+                else
                 {
-                    responseDetails = new ResponseDetails()
+                    var updateParameterHistory = await _context.tbl_ParameterHistory.FirstOrDefaultAsync(x => x.Id == parameterHistoryObj.Id);
+                    if (updateParameterHistory != null)
                     {
-                        StatusCode = System.Net.HttpStatusCode.BadRequest,
-                        Message = $"Only a maximum of {totalParameterCount} parameters can be added for the given SensorId"
-                    };
-                    return responseDetails;
-                }
+                        // Check if the SensorId has been changed
+                        if (updateParameterHistory.SensorId != parameterHistoryObj.SensorId)
+                        {
+                            // Check if the new SensorId already exists in the database
+                            var existingParameterHistory = await _context.tbl_ParameterHistory
+                                .FirstOrDefaultAsync(x => x.SensorId == parameterHistoryObj.SensorId);
 
-                // Assign current date/time to the sensor data
-                sensorData_tbl.DateTime = DateTime.Now;
+                            if (existingParameterHistory != null)
+                            {
+                                // Handle if a parameter history record with the same SensorId already exists
+                                // You can throw an exception or return an appropriate response indicating the error
+                                responseDetail = new ResponseDetails 
+                                { 
+                                    Message = "Parameter history record with the same SensorId already exists.", 
+                                    Success = false 
+                                };
+                                return responseDetail;
+                            }
+                        }
 
-                // Fill the parameter values
-                for (int i = 0; i < totalParameterCount; i++)
-                {
-                    var parameterProperty = parameterProperties.ElementAtOrDefault(i);
-                    if (parameterProperty != null)
+                        listParameter = new List<ParameterDto>();
+                        listParameter = JsonConvert.DeserializeObject<List<ParameterDto>>(updateParameterHistory.ParameterHistory);
+                        listParameter.Add(parameterHistoryObj.parameterObj);
+                        updateParameterHistory.ParameterHistory = JsonConvert.SerializeObject(listParameter);
+                        updateParameterHistory.SensorId = parameterHistoryObj.SensorId;
+                        _context.SaveChanges();
+                    }
+                    else
                     {
-                        var parameterValue = (string)parameterProperty.GetValue(sensorData_tbl);
-                        parameterValue = string.IsNullOrEmpty(parameterValue) ? $"P{i + 1} value" : parameterValue;
-                        parameterProperty.SetValue(sensorData_tbl, parameterValue);
+                        // Handle if the parameter history record doesn't exist
+                        responseDetail = new ResponseDetails 
+                        {
+                            Message = "Parameter history record not found.", 
+                            Success = false 
+                        };
+                        return responseDetail;
                     }
                 }
-
-                _context.SensorData_tbl.Add(sensorData_tbl);
-                await _context.SaveChangesAsync();
-
-                responseDetails = new ResponseDetails()
-                {
-                    StatusCode = System.Net.HttpStatusCode.OK,
-                    Message = "Sensor data saved successfully.",
-                    data = sensorData_tbl
-                };
             }
             catch (Exception ex)
             {
-                responseDetails = new ResponseDetails()
+                // Handle exceptions or log the error
+                responseDetail = new ResponseDetails
                 {
-                    StatusCode = System.Net.HttpStatusCode.InternalServerError,
-                    Message = "An error occurred while saving the sensor data."
+                    Message = "An error occurred while adding/editing parameter history.",
+                    Success = false
                 };
+                return responseDetail;
             }
+            // Handle success case
+            responseDetail = new ResponseDetails
+            {
+                Message = "Parameter history added/edited successfully.",
+                Success = true
+            };
+            return await Task.Run(() => responseDetail); // Return the responseDetail object with wrapping it in Task.Run
+        }
 
-            return responseDetails;
-        }*/
-
-
-
-        public async Task<List<SensorData_tbl>> GetSensorData()
+        public async Task<List<ParameterHistoryDto>> GetAllParameterHistory()
         {
             try
             {
-                var sensorData = await _context.SensorData_tbl.ToListAsync();
-                return sensorData;
+                var parameterHistoryList = await _context.tbl_ParameterHistory.ToListAsync();
+                var parameterHistoryDtoList = new List<ParameterHistoryDto>();
+
+                foreach (var parameterHistory in parameterHistoryList)
+                {
+                    var parameterDtoList = JsonConvert.DeserializeObject<List<ParameterDto>>(parameterHistory.ParameterHistory);
+
+                    var parameterHistoryDto = new ParameterHistoryDto
+                    {
+                        Id = parameterHistory.Id,
+                        SensorId = parameterHistory.SensorId,
+                        parameterObj = parameterDtoList.LastOrDefault() // Assuming you want to retrieve the latest parameter object
+                    };
+
+                    parameterHistoryDtoList.Add(parameterHistoryDto);
+                }
+
+                return parameterHistoryDtoList;
             }
             catch (Exception ex)
             {
-                // Handle exception appropriately
+                // Handle exceptions or log the error
                 throw;
             }
         }
+
+        public async Task<List<ParameterHistoryDto>> GetParameterHistoryBySensorId(int sensorId)
+        {
+            try
+            {
+                var parameterHistoryList = await _context.tbl_ParameterHistory
+                    .Where(p => p.SensorId == sensorId)
+                    .ToListAsync();
+
+                var parameterHistoryDtoList = new List<ParameterHistoryDto>();
+
+                foreach (var parameterHistory in parameterHistoryList)
+                {
+                    var parameterDtoList = JsonConvert.DeserializeObject<List<ParameterDto>>(parameterHistory.ParameterHistory);
+
+                    var parameterHistoryDto = new ParameterHistoryDto
+                    {
+                        Id = parameterHistory.Id,
+                        SensorId = parameterHistory.SensorId,
+                        parameterObj = parameterDtoList.LastOrDefault()
+                    };
+
+                    parameterHistoryDtoList.Add(parameterHistoryDto);
+                }
+
+                return parameterHistoryDtoList;
+            }
+            catch (Exception ex)
+            {
+                // Handle exceptions or log the error
+                throw;
+            }
+        }
+
+
     }
 }

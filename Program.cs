@@ -56,25 +56,14 @@ builder.Services.AddDbContext<AppDbContext>(option =>
     option.UseSqlServer(builder.Configuration.GetConnectionString("SQLServer"));
 });
 
-builder.Services.AddAuthentication(x =>
+builder.Services.AddAuthentication(options =>
 {
-    x.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    x.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
-
-    x.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
 })
 .AddJwtBearer(options =>
-{
-    //x.RequireHttpsMetadata = false;
-    //x.SaveToken = true;
-    //x.TokenValidationParameters = new TokenValidationParameters
-    //{
-    //    ValidateIssuerSigningKey = true,
-    //    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("veryverysceret")),
-    //    ValidateAudience = false,
-    //    ValidateIssuer = false,
-    //    ClockSkew = TimeSpan.Zero
-    //};
+{    
     options.SaveToken = true;
     options.RequireHttpsMetadata = false;
     options.TokenValidationParameters = new TokenValidationParameters()
@@ -87,13 +76,6 @@ builder.Services.AddAuthentication(x =>
     };
 
 });
-/*builder.Services.AddAuthorization(options =>
-{
-    options.AddPolicy("UserPolicy", policy =>
-        policy.RequireRole("User")); // Add a policy that requires the "User" role
-    options.AddPolicy("RequireUserRole", policy =>
-        policy.RequireRole("User"));
-});*/
 
 var app = builder.Build();
 

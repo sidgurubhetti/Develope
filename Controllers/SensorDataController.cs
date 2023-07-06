@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Newtonsoft.Json;
 using SensorProject.Entities;
 using SensorProject.IRepository;
 using SensorProject.Models.Dto;
@@ -16,62 +17,32 @@ namespace SensorProject.Controllers
             _sensorDataRepository = sensorDataRepository;
         }
 
-        [HttpPost("AddSensorData")]
-        /*public async Task<IActionResult> AddSensorData(SensorData_tbl sensorData_tbl)
+
+        [HttpPost("AddEditParameterHistory")]
+        public async Task<IActionResult> AddEditParameterHistory(ParameterHistoryDto sensorHistoryObj)
         {
-            if (!ModelState.IsValid)
-            {
-                var errorResponse = new ResponseDetails()
-                {
-                    StatusCode = System.Net.HttpStatusCode.BadRequest,
-                    Message = "Invalid sensor data.",
-                    data = ModelState
-                };
-                return BadRequest(errorResponse);
-            }
-            var responseDetails = await _sensorDataRepository.AddSensorData(sensorData_tbl);
+            var responseDetails = await _sensorDataRepository.AddEditParameterHistory(sensorHistoryObj);
             return Ok(responseDetails);
-        }*/
-        [HttpGet]
-        public async Task<IActionResult> GetSensorData()
-        {
-            try
-            {
-                var sensorData = await _sensorDataRepository.GetSensorData();
-
-                foreach (var data in sensorData)
-                {
-                    var parameterValues = new List<int>();
-
-                    for (int i = 1; i <= data.TotalParameter; i++)
-                    {
-                        var parameterValue = (int)data.GetType().GetProperty($"Parameter{i}").GetValue(data);
-                        parameterValues.Add(parameterValue);
-                    }
-
-                    Console.WriteLine($"SensorDataId: {data.SenDataId}, SensorId: {data.SensorId}, DateTime: {data.DateTime}, Parameters: [{string.Join(", ", parameterValues)}]");
-                }
-
-                return Ok(sensorData);
-            }
-            catch (Exception ex)
-            {
-                // Log the exception and return an appropriate error response
-                return StatusCode(500, "An error occurred while retrieving sensor data.");
-            }
         }
 
+        [HttpGet("GetAllParameterHistory")]
+        public async Task<IActionResult> GetAllParameterHistory()
+        {
+            var parameterHistoryList = await _sensorDataRepository.GetAllParameterHistory();
+            return Ok(parameterHistoryList);
+        }
 
+        [HttpGet("GetParameterHistoryBySensorId/{sensorId}")]
+        public async Task<IActionResult> GetParameterHistoryBySensorId(int sensorId)
+        {
+            var parameterHistoryList = await _sensorDataRepository.GetParameterHistoryBySensorId(sensorId);
+            if (parameterHistoryList == null || parameterHistoryList.Count == 0)
+            {
+                return NotFound();
+            }
+
+            return Ok(parameterHistoryList);
+        }
     }
 }
 
-/*{
-  "sensorId": 3,
-  "totalParameter": 5,
-  "dateTime": "2023-06-26T11:30:41.193Z",
-  "p1": 55,
-  "p2": 22,
-  "p3": 42,
-  "p4": 23,
-  "p5": 35
-}*/

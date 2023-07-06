@@ -5,10 +5,10 @@ namespace SensorProject.IRepository
 {
     public interface ISensorDataRepository
     {
-        //Task<ResponseDetails> AddSensorData(SensorData_tbl sensorData_tbl);
+        Task<List<ParameterHistoryDto>> GetAllParameterHistory();
+        Task<ResponseDetails> AddEditParameterHistory(ParameterHistoryDto parameterHistoryObj);
+        Task<List<ParameterHistoryDto>> GetParameterHistoryBySensorId(int sensorId);
 
-        Task<List<SensorData_tbl>> GetSensorData();
-        //Task<List<SensorData_tbl>> GetAll();
 
     }
 }

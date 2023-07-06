@@ -7,8 +7,6 @@ namespace SensorProject.IRepository
     {
         Task<ResponseDetails> AddSensor(Sensor_tbl sensor_Tbl);
         Task<ResponseDetails> AddSensorParameter(List<SensorParameter_tbl> sensorParaObj);
-        Task<ResponseDetails> AddEditParameterHistory(ParameterHistoryDto parameterHistoryObj);
-
         
     }
 }

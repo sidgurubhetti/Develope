@@ -1,10 +1,12 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace SensorProject.Entities
 {
     public class SensorParameter_tbl
     {
         [Key]
+        [JsonIgnore]
         public int SensorParameterId { get; set; }
         public string? SensorParameterName { get; set; }
         public  int? SensorId { get; set; }

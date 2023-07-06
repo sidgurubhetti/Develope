@@ -7,5 +7,6 @@ namespace SensorProject.Models.Dto
         public string? Message { get; set; }
         public HttpStatusCode StatusCode { get; set; }  
         public dynamic? data { get; set; }
+        public bool Success { get; set; }
     }
 }

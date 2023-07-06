@@ -16,13 +16,13 @@ namespace SensorProject.Controllers
             this._IsensorRepo = IsensorRepo;  
         }
 
-        [HttpPost("AddSensor")]
+        [HttpPost("AddSensorName")]
         public async Task<IActionResult> AddSensor(Sensor_tbl sensor_Tbl)
-        {
-            
+        {            
             var responseDetails=await _IsensorRepo.AddSensor(sensor_Tbl);
             return Ok(responseDetails);
         }
+
         [HttpPost("AddSensorParameter")]
         public async Task<IActionResult> AddSensorParameter(List<SensorParameter_tbl> sensorParaObj)
         {
@@ -30,11 +30,5 @@ namespace SensorProject.Controllers
             return Ok(responseDetails);
         }
 
-        [HttpPost("AddEditParameterHistory")]
-        public async Task<IActionResult> AddEditParameterHistory(ParameterHistoryDto sensorHistoryObj)
-        {
-            var responseDetails = await _IsensorRepo.AddEditParameterHistory(sensorHistoryObj);
-            return Ok(responseDetails);
-        }
     }
 }

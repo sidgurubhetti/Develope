@@ -4,25 +4,20 @@ using System.Text;
 using SensorProject.Context;
 using Microsoft.EntityFrameworkCore;
 using SensorProject.Helpers;
-using System.Diagnostics;
 using System.IdentityModel.Tokens.Jwt;
-using System;
 using System.Security.Claims;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.AspNetCore.Authorization;
 using System.Security.Cryptography;
-using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using SensorProject.Models.Dto;
 using System.ComponentModel.DataAnnotations;
 using SensorProject.Entities;
-using Microsoft.AspNetCore.Authorization;
-
 
 namespace SensorProject.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    //[Authorize(AuthenticationSchemes = Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme)]
+    [Authorize(AuthenticationSchemes = Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme)]
     public class UserController : ControllerBase
     {
         private readonly AppDbContext _authContext;
@@ -31,7 +26,7 @@ namespace SensorProject.Controllers
             _authContext = context;
         }
 
-        [HttpPost("authenticate")]
+        [HttpPost("Logine")]
         [AllowAnonymous]
         public async Task<IActionResult> Authenticate([FromBody] User userObj)
         {
@@ -42,7 +37,7 @@ namespace SensorProject.Controllers
                 .FirstOrDefaultAsync(x => x.Username == userObj.Username);
 
             if (user == null)
-                return NotFound(new { Message = "User not found!" });
+                return NotFound(new { Message = "User not found Please Enter Valid User Name!" });
 
             if (!PasswordHasher.VerifyPassword(userObj.Password, user.Password))
             {
@@ -62,18 +57,18 @@ namespace SensorProject.Controllers
             string auth_token = new JwtSecurityTokenHandler().WriteToken(token);
 
 
-            //user.Token = CreateJwt(user);
-            //var newAccessToken = user.Token;
-            //var newRefreshToken = CreateRefreshToken();
-            //user.RefreshToken = newRefreshToken;
-            //user.RefreshTokenExpiryTime = DateTime.Now.AddDays(5);
+            // Generate a new refresh token
+            var newRefreshToken = CreateRefreshToken();
+            user.RefreshToken = newRefreshToken;
+            user.RefreshTokenExpiryTime = DateTime.Now.AddMinutes(1);
             await _authContext.SaveChangesAsync();
+
 
             return Ok(new
             {
-                access_token=auth_token
-            }
-            );
+                access_token = auth_token,
+                Refresh_token = newRefreshToken
+            });
         }
 
         [HttpPost("register")]
@@ -126,6 +121,62 @@ namespace SensorProject.Controllers
             });
         }
 
+        [HttpGet("Users Details")]
+        //[Authorize(Roles = "Users")]
+        public async Task<ActionResult<User>> GetAllUsers()
+        {
+            return Ok(await _authContext.Users.ToListAsync());
+        }
+
+        [HttpPost("refresh")]
+        [AllowAnonymous]
+        public async Task<IActionResult> Refresh([FromBody] TokenApiDto tokenApiDto)
+        {
+            if (tokenApiDto is null)
+                return BadRequest("Invalid Client Request");
+
+            string accessToken = tokenApiDto.AccessToken;
+            string refreshToken = tokenApiDto.RefreshToken;
+
+            // Validate the expired access token and extract the claims
+            var principal = GetPrincipleFromExpiredToken(accessToken);
+            var username = principal.Identity.Name;
+
+            var user = await _authContext.Users.FirstOrDefaultAsync(u => u.Username == username && u.RefreshToken == refreshToken /*&& u.RefreshTokenExpiryTime > DateTime.Now*/);
+
+            if (user is null)
+                return BadRequest("Invalid Request");
+
+            //var role = principal.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Role)?.Value;
+
+            // Generate a new access token
+            var authClaims = new List<Claim>
+            {
+                new Claim(ClaimTypes.Name, user.Username),
+                new Claim(ClaimTypes.Role, user.Role)
+                // Add any additional claims as needed
+            };
+
+            var newAccessToken = GetToken(authClaims);
+            string auth_token = new JwtSecurityTokenHandler().WriteToken(newAccessToken);
+
+            // Generate a new refresh token
+            var newRefreshToken = CreateRefreshToken();
+
+            // Update the user's refresh token and expiry time
+            user.RefreshToken = newRefreshToken;
+            user.RefreshTokenExpiryTime = DateTime.Now.AddMinutes(1);
+
+            await _authContext.SaveChangesAsync();
+
+            return Ok(new TokenApiDto()
+            {
+                AccessToken = auth_token,
+                RefreshToken = newRefreshToken
+            });
+        }
+
+
         private bool IsValidPhoneNumber(string phoneNumber)
         {
             // Phone number pattern: 10 digits, allowing optional leading country code and hyphens
@@ -138,7 +189,6 @@ namespace SensorProject.Controllers
             return regex.IsMatch(phoneNumber);
         }
 
-
         private Task<bool> CheckEmailExistAsync(string? email)
             => _authContext.Users.AnyAsync(x => x.Email == email);
 
@@ -148,12 +198,12 @@ namespace SensorProject.Controllers
         private static string CheckPasswordStrength(string pass)
         {
             StringBuilder sb = new StringBuilder();
-            if (pass.Length < 9)
+            if (pass.Length < 8)
                 sb.Append("Minimum password length should be 8" + Environment.NewLine);
             if (!(Regex.IsMatch(pass, "[a-z]") && Regex.IsMatch(pass, "[A-Z]") && Regex.IsMatch(pass, "[0-9]")))
                 sb.Append("Password should be AlphaNumeric" + Environment.NewLine);
             if (!Regex.IsMatch(pass, "[<,>,@,!,#,$,%,^,&,*,(,),_,+,\\[,\\],{,},?,:,;,|,',\\,.,/,~,`,-,=]"))
-                sb.Append("Password should contain special charcter" + Environment.NewLine);
+                sb.Append("Password should contain min 1 special charcter" + Environment.NewLine);
             return sb.ToString();
         }
 
@@ -162,41 +212,20 @@ namespace SensorProject.Controllers
             var authSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("JWTAuthenticationHIGHsecuredPasswordVVVp1OH7Xzyr"));
 
             var token = new JwtSecurityToken(
-               audience : "http://localhost:4200",
-                    issuer : "https://localhost:7058",
-               
-                expires: DateTime.Now.AddHours(3),
+               audience: "http://localhost:4200",
+                    issuer: "https://localhost:7058",
+
+                expires: DateTime.Now.AddMinutes(2),
                 claims: authClaims,
                 signingCredentials: new SigningCredentials(authSigningKey, SecurityAlgorithms.HmacSha256)
                 );
 
             return token;
         }
-        private string CreateJwt(User user)
-        {
-            var jwtTokenHandler = new JwtSecurityTokenHandler();
-            var key = Encoding.ASCII.GetBytes("veryverysceret");
-            var identity = new ClaimsIdentity(new Claim[]
-            {
-                new Claim(ClaimTypes.Role, user.Role),
-                new Claim(ClaimTypes.Name,$"{user.Username}")
-            });
-
-            var credentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256);
-
-            var tokenDescriptor = new SecurityTokenDescriptor
-            {
-                Subject = identity,
-                Expires = DateTime.Now.AddSeconds(30),
-                SigningCredentials = credentials
-            };
-            var token = jwtTokenHandler.CreateToken(tokenDescriptor);
-            return jwtTokenHandler.WriteToken(token);
-        }
 
         private string CreateRefreshToken()
         {
-            var tokenBytes = RandomNumberGenerator.GetBytes(64);
+            /*var tokenBytes = RandomNumberGenerator.GetBytes(64);
             var refreshToken = Convert.ToBase64String(tokenBytes);
 
             var tokenInUser = _authContext.Users
@@ -205,61 +234,39 @@ namespace SensorProject.Controllers
             {
                 return CreateRefreshToken();
             }
-            return refreshToken;
+            return refreshToken;*/
+            var tokenBytes = new byte[64];
+            using (var rng = RandomNumberGenerator.Create())
+            {
+                rng.GetBytes(tokenBytes);
+            }
+
+            return Convert.ToBase64String(tokenBytes);
         }
 
         private ClaimsPrincipal GetPrincipleFromExpiredToken(string token)
         {
-            var key = Encoding.ASCII.GetBytes("veryverysceret.....");
+            var key = Encoding.ASCII.GetBytes("JWTAuthenticationHIGHsecuredPasswordVVVp1OH7Xzyr");
             var tokenValidationParameters = new TokenValidationParameters
             {
-                ValidateAudience = false,
-                ValidateIssuer = false,
+                ValidateAudience = true,
+                ValidAudience = "http://localhost:4200",
+                ValidateIssuer = true,
+                ValidIssuer = "https://localhost:7058",
                 ValidateIssuerSigningKey = true,
                 IssuerSigningKey = new SymmetricSecurityKey(key),
-                ValidateLifetime = false
+                ValidateLifetime = true
             };
             var tokenHandler = new JwtSecurityTokenHandler();
             SecurityToken securityToken;
-            var principal = tokenHandler.ValidateToken(token,tokenValidationParameters, out securityToken);
+            var principal = tokenHandler.ValidateToken(token, tokenValidationParameters, out securityToken);
             var jwtSecurityToken = securityToken as JwtSecurityToken;
             if (jwtSecurityToken == null || !jwtSecurityToken.Header.Alg.Equals(SecurityAlgorithms.HmacSha256, StringComparison.InvariantCultureIgnoreCase))
                 throw new SecurityTokenException("This is Invalid Token");
             return principal;
-                
+
         }
 
-        
-        [HttpGet]
-        [Authorize/*(Roles = "User")*/] 
-        public async Task<ActionResult<User>> GetAllUsers()
-        {            
-            return Ok(await _authContext.Users.ToListAsync());
-        }
-
-        [HttpPost("refresh")]
-        [AllowAnonymous]
-        public async Task<IActionResult> Refresh([FromBody]TokenApiDto tokenApiDto)
-        {
-            if (tokenApiDto is null)
-                return BadRequest("Invalid Client Request");
-            string accessToken = tokenApiDto.AccessToken;
-            string refreshToken = tokenApiDto.RefreshToken;
-            var principal = GetPrincipleFromExpiredToken(accessToken);
-            var username = principal.Identity.Name;
-            var user = await _authContext.Users.FirstOrDefaultAsync(u => u.Username == username);
-            if (user is null || user.RefreshToken != refreshToken || user.RefreshTokenExpiryTime <= DateTime.Now)
-                return BadRequest("Invalid Request");
-            var newAccessToken = CreateJwt(user);
-            var newRefreshToken = CreateRefreshToken();
-            user.RefreshToken = newRefreshToken;
-            await _authContext.SaveChangesAsync();
-            return Ok(new TokenApiDto()
-            {
-                AccessToken = newAccessToken,
-                RefreshToken = newRefreshToken,
-            });
-        }
 
     }
 
